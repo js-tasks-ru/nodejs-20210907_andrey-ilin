@@ -14,9 +14,10 @@ const fileUploadHandler = (filepath, req, res) => {
 
             limitStream.on('error', (err) => {
                 if (err.code === 'LIMIT_EXCEEDED') {
-                    fs.rmSync(filepath, { force: true });
-                    res.statusCode = 413;
-                    res.end()
+                    fs.rm(filepath, { force: true }, () => {
+                        res.statusCode = 413;
+                        res.end()
+                    });
                 }
             })
 
@@ -26,8 +27,9 @@ const fileUploadHandler = (filepath, req, res) => {
             });
 
             req.on('aborted', () => {
-                fs.rmSync(filepath, { force: true });
-                fileWriter.destroy();
+                fs.rm(filepath, { force: true }, () => {
+                    fileWriter.destroy();
+                });
             });
         } else {
             res.statusCode = 409;
