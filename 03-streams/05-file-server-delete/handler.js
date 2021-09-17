@@ -1,15 +1,19 @@
 const fs = require('fs');
 
 const fileDeleteHandler = (filepath, req, res) => {
-    fs.stat(filepath, (err, stat) => {
-        if (err && err.code === 'ENOENT') {
-            res.statusCode = 404;
-            res.end();    
+    fs.unlink(filepath, (err) => {
+        if (!err) {
+            res.end();
         } else {
-            fs.rm(filepath, { force: true }, () => {
-                res.end();
-            });
+            if (err.code === 'ENOENT') {
+                res.statusCode = 404;
+                res.end();     
+            } else {
+                res.statusCode = 500;
+                res.end();  
+            }
         }
+       
     });
 }
 
