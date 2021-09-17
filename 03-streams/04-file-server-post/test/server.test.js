@@ -87,11 +87,13 @@ describe('streams/file-server-post', () => {
                     'файл big.png не должен оставаться на диске'
                 ).to.be.false;
                 done();
-              }, 100);
+
+              }, 1000);
             });
 
         request.on('error', (err) => {
           // EPIPE/ECONNRESET error should occur because we try to pipe after res closed
+          console.log('при попытке создания слишком большого файла - ошибка 413: ', err);
           if (!['ECONNRESET', 'EPIPE'].includes(err.code)) done(err);
         });
 

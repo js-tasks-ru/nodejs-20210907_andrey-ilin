@@ -10,13 +10,32 @@ const fileUploadHandler = (filepath, req, res) => {
         if (err && err.code === 'ENOENT') {
             const fileWriter = fs.createWriteStream(filepath);
             const limitStream = createLimitSizeStream(BITE_IN_MB);
-            req.pipe(limitStream).pipe(fileWriter);
+            req.on('error', (err) => {
+                console.log('0 : ', err);
+            })
+            .pipe(limitStream)
+            .on('error', (err) => {
+                console.log('1 : ', err);
+            })
+            .pipe(fileWriter)
+            .on('error', (err) => {
+                console.log('1 : ', err);
+            });
 
             limitStream.on('error', (err) => {
                 if (err.code === 'LIMIT_EXCEEDED') {
-                    fs.unlinkSync(filepath);
+                    fileWriter.destroy();
                     res.statusCode = 413;
                     res.end();
+                    fs.unlink(filepath, (err) => {
+                        if (err) {
+                            console.error(err);
+                        } else {
+                           res.statusCode = 413;
+                           res.end();
+                        }
+                     
+                    });
                 }
             })
 
@@ -26,8 +45,12 @@ const fileUploadHandler = (filepath, req, res) => {
             });
 
             req.on('aborted', () => {
-                fs.unlinkSync(filepath);
-                fileWriter.destroy();
+                fs.unlink(filepath, (err) => {
+                    if (err) {
+                        console.error(err);
+                    }
+                    fileWriter.destroy();
+                });
             });
         } else {
             res.statusCode = 409;
