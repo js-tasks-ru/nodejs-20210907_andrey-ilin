@@ -6,56 +6,42 @@ const BITE_IN_MB = 1024 * 1024;
 const createLimitSizeStream = (limit) => new LimitSizeStream({ limit });
 
 const fileUploadHandler = (filepath, req, res) => {
-    fs.stat(filepath, (err, stat) => {
-        if (err && err.code === 'ENOENT') {
-            const fileWriter = fs.createWriteStream(filepath);
-            const limitStream = createLimitSizeStream(BITE_IN_MB);
-            req.on('error', (err) => {
-                console.log('0 : ', err);
-            })
-            .pipe(limitStream)
-            .on('error', (err) => {
-                console.log('1 : ', err);
-            })
-            .pipe(fileWriter)
-            .on('error', (err) => {
-                console.log('1 : ', err);
-            });
+    const fileWriter = fs.createWriteStream(filepath, {flags: 'wx'});
+    const limitStream = createLimitSizeStream(BITE_IN_MB);
+    req.pipe(limitStream).pipe(fileWriter);
 
-            limitStream.on('error', (err) => {
-                if (err.code === 'LIMIT_EXCEEDED') {
-                    fileWriter.destroy();
-                    res.statusCode = 413;
-                    res.end();
-                    fs.unlink(filepath, (err) => {
-                        if (err) {
-                            console.error(err);
-                        } else {
-                           res.statusCode = 413;
-                           res.end();
-                        }
-                     
-                    });
-                }
-            })
+    fileWriter.on('finish', () => {
+        res.statusCode = 201;
+        res.end('created');
+    });
 
-            fileWriter.on('finish', () => {
-                res.statusCode = 201;
-                res.end();
-            });
-
-            req.on('aborted', () => {
-                fs.unlink(filepath, (err) => {
-                    if (err) {
-                        console.error(err);
-                    }
-                    fileWriter.destroy();
-                });
-            });
+    limitStream.on('error', (err) => {
+        if (err.code === 'LIMIT_EXCEEDED') {
+            res.statusCode = 413;
+            res.end('file too big');
         } else {
-            res.statusCode = 409;
-            res.end();
+            res.statusCode = 500;
+            res.end('internal error'); 
         }
+
+        fileWriter.destroy();
+        fs.unlink(filepath, (err) => {});
+    })
+
+    fileWriter.on('error', (err) => {
+        if (err.code === 'EEXIST') {
+            res.statusCode = 409;
+            res.end('file exist');
+        } else {
+            res.statusCode = 500;
+            res.end('internal error'); 
+        }
+    });
+
+    req.on('aborted', () => {
+        limitStream.destroy();
+        fileWriter.destroy();
+        fs.unlink(filepath, (err) => {});
     })
 }
 
